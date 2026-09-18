@@ -9,7 +9,7 @@ A tiny [Hermes Desktop](https://github.com/NousResearch/hermes-agent) plugin tha
 - **Top 10 by market cap** by default — fetched live from `/coins/markets`, so the list always follows current rankings (never a stale hard-coded list)
 - **Marquee ticker**: slides left, wraps seamlessly from the right; hover to pause; respects the OS reduce-motion setting
 - **Manage coins**: search any CoinGecko coin, pin/remove coins, or reset to the live Top 10 — all from the command palette
-- **Custom currencies**: pick from 60+ CoinGecko-supported display currencies (USD, IDR, EUR, JPY, SGD, …) — add, remove, and switch in the same manage tab
+- **Custom currencies**: pick from 60+ CoinGecko-supported display currencies (USD, IDR, EUR, JPY, SGD, …) — add, remove, and switch in the same Settings tab
 - **USD ⇄ IDR** display switch, persisted across restarts
 - Click the ticker to refresh instantly; a small dot marks stale data when a fetch fails
 - Rate-limit friendly: 1 request/minute, backs off 5 minutes on HTTP 429
@@ -32,8 +32,8 @@ Press `Ctrl+K` (command palette) and type "crypto":
 | Command | What it does |
 |---|---|
 | **Refresh now** | Force a refetch |
-| **Ganti mata uang (siklus daftar)** | Cycle through your enabled display currencies |
-| **Kelola Koin & Mata Uang** | Open the manage tab — coins: search (≥ 2 letters) → add, remove pinned coins, reset to the live Top 10; currencies: set active, add from the supported list, remove, reset |
+| **Cycle display currency** | Cycle through your enabled display currencies |
+| **Open Settings** | Open the settings tab — coins: search (≥ 2 letters) → add, remove pinned coins, reset to the live Top 10; currencies: set active, add from the supported list, remove, reset; ticker: width slider |
 
 Once you add or remove a coin, the list locks to your choice; **Reset** returns to the automatic Top 10.
 

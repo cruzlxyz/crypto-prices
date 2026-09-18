@@ -1,41 +1,40 @@
 /**
  * crypto-prices — Hermes DESKTOP plugin (status bar).
  *
- * Menampilkan harga crypto live di status bar bagian bawah kanan jendela
- * Hermes Desktop. Data dari CoinGecko public API (gratis, tanpa API key),
- * auto-refresh tiap 60 detik, dan harga terakhir di-cache ke storage plugin
- * supaya bar tetap menampilkan data saat app baru dibuka (offline → data
- * stale + titik peringatan).
+ * Live cryptocurrency prices as a scrolling ticker in the bottom-right status
+ * bar of the Hermes Desktop window. Data from the CoinGecko public API (free,
+ * no API key), auto-refresh every 60 seconds, with the last prices cached to
+ * plugin storage so the bar is never empty on launch (offline -> stale data +
+ * warning dot).
  *
- * Fitur:
- *  - Koin default: Top 10 market cap (diambil live dari /coins/markets,
- *    jadi selalu ikut peringkat terbaru — bukan daftar statis).
- *  - Tampilan ticker: harga berjalan ke kiri dalam kotak selebar 1360px
- *    (menyusut otomatis di jendela sempit, max 70vw), pas mentok muncul
- *    lagi dari kanan (marquee mulus, konten diduplikasi + CSS loop).
- *  - Klik item status bar → refresh langsung; hover = jeda animasi.
- *  - Naik ▲ hijau / turun ▼ merah, dengan fallback ke token tema yang
- *    pasti terdefinisi (--ui-green / --ui-red di styles.css).
- *  - Kena rate-limit 429 → mundur 5 menit sebelum refetch berikutnya.
- *  - Perintah Ctrl+K:
- *      · Refresh now
- *      · Ganti mata uang (siklus daftar mata uang yang aktif)
- *      · Kelola Koin & Mata Uang (buka tab: koin — cari/tambah/hapus/reset;
- *        mata uang — pilih aktif/tambah/hapus/reset)
+ * Features:
+ *  - Default coins: Top 10 by market cap (fetched live from /coins/markets,
+ *    so the list always follows current rankings - never a static list).
+ *  - Marquee ticker: prices slide left inside a fixed-width box and re-enter
+ *    from the right (seamless loop, duplicated content + CSS animation).
+ *  - Click the status bar item to refresh; hover pauses the animation.
+ *  - Up green / down red, with fallbacks to theme tokens that are always
+ *    defined (--ui-green / --ui-red in styles.css).
+ *  - HTTP 429 -> back off 5 minutes before the next refetch.
  *
- * Konfigurasi (tersimpan di ctx.storage, key namespace hermes.plugin.crypto-prices.*):
- *  - tickWidth : lebar kotak ticker dalam px (default 1360, diatur dari tab
- *                Kelola — slider; tetap dibatasi maks 70% lebar jendela)
- *  - vs     : mata uang aktif (harus anggota vsList)
- *  - vsList : daftar mata uang yang bisa disiklus/dipilih
- *             (default: ['usd','idr']; sumber daftar lengkap:
- *             /simple/supported_vs_currencies)
- *  - coins  : null = otomatis Top 10 market cap; atau daftar pin
- *             [{id, symbol}, ...] dari tab Kelola Koin.
- *             Kosong (habis dihapus semua) → balik ke otomatis Top 10.
+ * Commands (Ctrl+K):
+ *      - Refresh now
+ *      - Cycle display currency
+ *      - Open Settings (coins: search/add/remove/reset; currencies:
+ *        set active/add/remove/reset; ticker width slider)
  *
- * Plain ESM, tanpa build step. Loader desktop hanya mengizinkan import
- * '@hermes/plugin-sdk', 'react', dan 'react/jsx-runtime'.
+ * Config (stored under ctx.storage, keys namespaced hermes.plugin.crypto-prices.*):
+ *  - vs        : active display currency (must be a member of vsList)
+ *  - vsList    : currencies available for cycling/switching
+ *                (default: ['usd','idr']; full list: /simple/supported_vs_currencies)
+ *  - coins     : null = auto Top 10 by market cap; or a pinned list
+ *                [{id, symbol}, ...] from the Settings tab.
+ *                Empty (everything removed) -> back to auto Top 10.
+ *  - tickWidth : ticker box width in px (default 1360, set from the Settings
+ *                tab slider; still capped at 70% of the window width)
+ *
+ * Plain ESM, no build step. The desktop loader only allows imports from
+ * '@hermes/plugin-sdk', 'react', and 'react/jsx-runtime'.
  */
 
 import { useEffect, useState } from 'react'
@@ -59,8 +58,8 @@ const REFRESH_MS = 60_000
 const API_BASE = 'https://api.coingecko.com/api/v3'
 const DEFAULT_VS_LIST = ['usd', 'idr']
 
-// Ticker/marquee: kotak lebar tetap, track berisi 2 salinan urutan koin,
-// animasi translateX(-50%) linear infinite → keluar kiri, masuk lagi kanan.
+// Ticker/marquee: fixed-width box, track holds two copies of the coin
+// sequence, translateX(-50%) linear infinite → exits left, re-enters right.
 const STYLE_ID = 'crypto-prices-styles'
 const TICKER_CSS = `
 @keyframes cp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -70,21 +69,21 @@ const TICKER_CSS = `
 @media (prefers-reduced-motion: reduce) { .cp-track { animation: none; } }
 `
 
-/** Shared di luar React supaya perintah palette bisa mengganti mata uang. */
+/** Shared outside React so palette commands can switch the display currency. */
 const vsAtom = atom('usd')
-/** Daftar mata uang aktif (bisa dikustom via tab Kelola). */
+/** Active display currencies (customizable from the Settings tab). */
 const vsListAtom = atom(DEFAULT_VS_LIST)
-/** null = otomatis Top 10; array [{id, symbol}] = daftar pin dari Kelola Koin. */
+/** null = auto Top 10; array [{id, symbol}] = pinned list from the Settings tab. */
 const coinsAtom = atom(null)
-/** Lebar kotak ticker (px) — diatur dari tab Kelola, diterapkan via CSS var. */
+/** Ticker box width (px) — set from the Settings tab, applied via a CSS var. */
 const widthAtom = atom(1360)
 
-/** Di-set di register(): menulis daftar koin ke atom + storage sekaligus. */
+/** Set in register(): writes the coin list to the atom + storage at once. */
 let setCoinsFn = null
 let setVsListFn = null
 let setTickWidthFn = null
 
-/** Timestamp backoff rate-limit (429) — refetch ditunda sampai lewat. */
+/** Rate-limit (429) backoff timestamp — refetches are delayed until it passes. */
 let backoffUntil = 0
 
 async function fetchMarkets(vs, ids) {
@@ -101,7 +100,7 @@ async function fetchMarkets(vs, ids) {
   return resp.json()
 }
 
-/** ids: string 'a,b,c' atau null (= Top 10). */
+/** ids: 'a,b,c' string, or null (= Top 10). */
 function useMarketRows(ids, vs, storage) {
   const query = useQuery({
     queryKey: [...QUERY_KEY, vs, ids || 'top10'],
@@ -109,7 +108,7 @@ function useMarketRows(ids, vs, storage) {
     refetchInterval: () => (Date.now() < backoffUntil ? 300_000 : REFRESH_MS),
     staleTime: 45_000,
     retry: 2,
-    // Seed dari cache storage agar bar langsung berisi saat app baru dibuka.
+    // Seed from the storage cache so the bar has data right after app launch.
     initialData: () => {
       const c = storage.get('lastData', null)
       return c && c.vs === vs && c.ids === ids && Array.isArray(c.rows) ? c.rows : undefined
@@ -124,10 +123,10 @@ function useMarketRows(ids, vs, storage) {
   return query
 }
 
-// Locale per mata uang: id-ID buat Rp (format 1.443.243.621), sisanya en-US.
-// en-US sudah ngasih simbol asli untuk mayoritas (¥, €, £, ₩, HK$, CN¥);
-// kode yang di en-US tampil sebagai kode ISO (SGD, THB, ...) sengaja dibiarkan
-// agar tidak ambigu dengan "$"-nya USD.
+// Locale per currency: id-ID for Rp (1.443.243.621 formatting), en-US otherwise.
+// en-US already yields native symbols for most codes (¥, €, £, ₩, HK$, CN¥);
+// codes that render as ISO letters there (SGD, THB, ...) are left as-is on
+// purpose so they never read as ambiguous "$" amounts.
 const VS_LOCALE = { idr: 'id-ID' }
 
 const _fmtCache = new Map()
@@ -151,7 +150,7 @@ function fmtPrice(p, vs) {
   try {
     return currencyFormatter(code, VS_LOCALE[key] || 'en-US', bucket).format(p)
   } catch {
-    // Kode di luar ISO 4217 (mis. vs kripto) — tampil kode + angka saja.
+    // Non-ISO code (e.g. a crypto vs) — show the code + number only.
     return `${code} ${bucket === 0 ? Math.round(p).toLocaleString('en-US') : p.toFixed(bucket === 2 ? 2 : 4)}`
   }
 }
@@ -164,8 +163,8 @@ function fmtChange(ch) {
 }
 
 function changeColor(ch) {
-  // Fallback ke --ui-red/--ui-green: dua token ini pasti terdefinisi
-  // (styles.css), --ui-success/--ui-danger tergantung tema runtime.
+  // Fall back to --ui-red/--ui-green: these two are always defined
+  // (styles.css); --ui-success/--ui-danger depend on the runtime theme.
   return ch >= 0 ? 'var(--ui-success, var(--ui-green))' : 'var(--ui-danger, var(--ui-red))'
 }
 
@@ -184,8 +183,8 @@ function StatusPrices({ storage }) {
     queryClient.invalidateQueries({ queryKey: QUERY_KEY })
   }
 
-  // Satu salinan urutan koin — selalu diakhiri '·' supaya sambungan loop
-  // antar salinan terlihat sama seperti bagian tengah.
+  // One copy of the coin sequence — always ends with '·' so the loop seam
+  // between copies looks identical to the middle.
   const chipRow = () =>
     (rows || []).flatMap((r) => {
       const price = r?.current_price
@@ -242,9 +241,9 @@ function StatusPrices({ storage }) {
       type: 'button',
       className: 'cp-btn',
       onClick: refresh,
-      title: `Crypto Prices (CoinGecko) — klik untuk refresh, hover untuk jeda${
-        updatedAt ? ` · update ${updatedAt}` : ''
-      }${isError ? ' · fetch gagal, menampilkan data terakhir' : ''}`,
+      title: `Crypto Prices (CoinGecko) — click to refresh, hover to pause${
+        updatedAt ? ` · updated ${updatedAt}` : ''
+      }${isError ? ' · fetch failed — showing last data' : ''}`,
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -277,14 +276,14 @@ function StatusPrices({ storage }) {
   )
 }
 
-/** Tab "Kelola Koin" — cari/tambah/hapus/reset, dibuka via host.openWorkspace. */
+/** Settings tab — coin search/add/remove/reset, opened via host.openWorkspace. */
 function ManageCoins({ storage }) {
   const coins = useValue(coinsAtom)
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
 
-  // Debounce pencarian ke /search.
+  // Debounced /search requests.
   useEffect(() => {
     const term = q.trim()
     if (term.length < 2) {
@@ -303,7 +302,7 @@ function ManageCoins({ storage }) {
           setResults((json.coins || []).slice(0, 6))
         }
       } catch {
-        // biarkan hasil sebelumnya
+        // keep previous results
       } finally {
         setSearching(false)
       }
@@ -314,7 +313,7 @@ function ManageCoins({ storage }) {
     }
   }, [q])
 
-  // Saat mode otomatis, pin pertama mengunci Top 10 yang sedang tampil + koin baru.
+  // In auto mode, the first pin locks the currently shown Top 10 plus the new coin.
   const baseList = () => {
     const current = coinsAtom.get()
     if (Array.isArray(current)) return current
@@ -327,12 +326,12 @@ function ManageCoins({ storage }) {
   const doAdd = (r) => {
     const base = baseList()
     if (base.some((c) => c.id === r.id)) {
-      host.notify({ kind: 'info', message: `${(r.symbol || r.name).toUpperCase()} sudah ada di daftar` })
+      host.notify({ kind: 'info', message: `${(r.symbol || r.name).toUpperCase()} is already in the list` })
       return
     }
     setCoinsFn([...base, { id: r.id, symbol: (r.symbol || r.id).toUpperCase() }])
     invalidate()
-    host.notify({ kind: 'info', message: `${(r.symbol || r.id).toUpperCase()} ditambahkan (${r.name})` })
+    host.notify({ kind: 'info', message: `${(r.symbol || r.id).toUpperCase()} (${r.name}) added` })
   }
 
   const doRemove = (id) => {
@@ -344,10 +343,10 @@ function ManageCoins({ storage }) {
   const doReset = () => {
     setCoinsFn(null)
     invalidate()
-    host.notify({ kind: 'info', message: 'Crypto Prices: kembali ke Top 10 market cap' })
+    host.notify({ kind: 'info', message: 'Crypto Prices: back to the Top 10 by market cap' })
   }
 
-  // ---- Mata uang ----
+  // ---- Currencies ----
   const vsList = useValue(vsListAtom)
   const vs = useValue(vsAtom)
   const tickWidth = useValue(widthAtom)
@@ -368,20 +367,20 @@ function ManageCoins({ storage }) {
   const doUseCurrency = (code) => {
     vsAtom.set(code)
     storage.set('vs', code)
-    host.notify({ kind: 'info', message: `Crypto Prices: harga dalam ${code.toUpperCase()}` })
+    host.notify({ kind: 'info', message: `Crypto Prices: prices in ${code.toUpperCase()}` })
   }
 
   const doAddCurrency = (code) => {
     const list = vsListAtom.get() || DEFAULT_VS_LIST
     if (list.includes(code)) return
     setVsListFn([...list, code])
-    host.notify({ kind: 'info', message: `Mata uang ${code.toUpperCase()} ditambahkan` })
+    host.notify({ kind: 'info', message: `Currency ${code.toUpperCase()} added` })
   }
 
   const doRemoveCurrency = (code) => {
     const list = vsListAtom.get() || DEFAULT_VS_LIST
     if (list.length <= 1) {
-      host.notify({ kind: 'info', message: 'Minimal harus ada satu mata uang' })
+      host.notify({ kind: 'info', message: 'At least one currency must remain' })
       return
     }
     const next = list.filter((c) => c !== code)
@@ -389,7 +388,7 @@ function ManageCoins({ storage }) {
     if (vsAtom.get() === code) {
       vsAtom.set(next[0])
       storage.set('vs', next[0])
-      host.notify({ kind: 'info', message: `Mata uang aktif pindah ke ${next[0].toUpperCase()}` })
+      host.notify({ kind: 'info', message: `Active currency switched to ${next[0].toUpperCase()}` })
     }
   }
 
@@ -397,7 +396,7 @@ function ManageCoins({ storage }) {
     setVsListFn(DEFAULT_VS_LIST)
     vsAtom.set(DEFAULT_VS_LIST[0])
     storage.set('vs', DEFAULT_VS_LIST[0])
-    host.notify({ kind: 'info', message: 'Mata uang kembali ke USD + IDR' })
+    host.notify({ kind: 'info', message: 'Currencies reset to USD + IDR' })
   }
 
   const term2 = q2.trim().toLowerCase()
@@ -431,8 +430,8 @@ function ManageCoins({ storage }) {
       jsxs('div', {
         key: 'head',
         children: [
-          jsx('div', { style: { fontWeight: 700, color: 'var(--ui-text-primary)', fontSize: '0.95rem' }, children: 'Kelola Koin — Crypto Prices' }),
-          jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Data: CoinGecko · mode default: Top 10 market cap' }),
+          jsx('div', { style: { fontWeight: 700, color: 'var(--ui-text-primary)', fontSize: '0.95rem' }, children: 'Crypto Prices — Settings' }),
+          jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Data: CoinGecko · default mode: Top 10 by market cap' }),
         ],
       }),
 
@@ -441,7 +440,7 @@ function ManageCoins({ storage }) {
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
-            children: pinned ? `Koin dipin (${coins.length})` : 'Koin saat ini: otomatis Top 10',
+            children: pinned ? `Pinned coins (${coins.length})` : 'Current coins: auto Top 10',
           }),
           ...(shown.length
             ? shown.map((c) =>
@@ -451,14 +450,14 @@ function ManageCoins({ storage }) {
                     jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: c.symbol }),
                     jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: c.id }),
                     pinned
-                      ? jsx(Button, { onClick: () => doRemove(c.id), children: 'Hapus' })
-                      : jsx('span', { style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem' }, children: 'otomatis' }),
+                      ? jsx(Button, { onClick: () => doRemove(c.id), children: 'Remove' })
+                      : jsx('span', { style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem' }, children: 'auto' }),
                   ],
                 }, c.id)
               )
-            : [jsx('div', { key: 'empty', style: { color: 'var(--ui-text-tertiary)' }, children: 'Memuat daftar…' })]),
+            : [jsx('div', { key: 'empty', style: { color: 'var(--ui-text-tertiary)' }, children: 'Loading list…' })]),
           pinned
-            ? jsx('div', { style: { marginTop: '8px' }, children: jsx(Button, { onClick: doReset, children: 'Reset ke Top 10' }) })
+            ? jsx('div', { style: { marginTop: '8px' }, children: jsx(Button, { onClick: doReset, children: 'Reset to Top 10' }) })
             : null,
         ],
       }),
@@ -466,15 +465,15 @@ function ManageCoins({ storage }) {
       jsxs('div', {
         key: 'add',
         children: [
-          jsx('div', { style: { fontWeight: 600, marginBottom: '4px' }, children: 'Tambah koin' }),
+          jsx('div', { style: { fontWeight: 600, marginBottom: '4px' }, children: 'Add coins' }),
           jsx(Input, {
             value: q,
             onChange: (e) => setQ(e?.target?.value ?? e),
-            placeholder: 'Cari nama atau simbol (mis. bitcoin, hype, pepe)…',
+            placeholder: 'Search by name or symbol (e.g. bitcoin, hype, pepe)…',
             style: { width: '100%', marginBottom: '6px' },
           }),
           searching
-            ? jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Mencari…' })
+            ? jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Searching…' })
             : null,
           ...results.map((r) =>
             jsxs('div', {
@@ -482,13 +481,13 @@ function ManageCoins({ storage }) {
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: (r.symbol || '').toUpperCase() }),
                 jsx('span', { style: { flex: 1 }, children: r.name }),
-                jsx(Button, { onClick: () => doAdd(r), children: 'Tambah' }),
+                jsx(Button, { onClick: () => doAdd(r), children: 'Add' }),
               ],
             }, r.id)
           ),
           jsx('div', {
             style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem', marginTop: '6px' },
-            children: 'Ketik minimal 2 huruf. Menambah koin akan mengunci daftar (pin); pakai Reset untuk balik ke Top 10 otomatis.',
+            children: 'Type at least 2 letters. Adding a coin pins the list; use Reset to return to the auto Top 10.',
           }),
         ],
       }),
@@ -498,29 +497,29 @@ function ManageCoins({ storage }) {
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
-            children: `Mata uang (${vsList.length}) — aktif: ${vs.toUpperCase()}`,
+            children: `Currencies (${vsList.length}) — active: ${vs.toUpperCase()}`,
           }),
           ...vsList.map((code) =>
             jsxs('div', {
               style: rowStyle,
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
-                jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: code === vs ? '● aktif' : '' }),
+                jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: code === vs ? '● active' : '' }),
                 code !== vs
-                  ? jsx(Button, { onClick: () => doUseCurrency(code), children: 'Pakai' })
+                  ? jsx(Button, { onClick: () => doUseCurrency(code), children: 'Use' })
                   : null,
-                jsx(Button, { onClick: () => doRemoveCurrency(code), disabled: vsList.length <= 1, children: 'Hapus' }),
+                jsx(Button, { onClick: () => doRemoveCurrency(code), disabled: vsList.length <= 1, children: 'Remove' }),
               ],
             }, code)
           ),
           jsx(Input, {
             value: q2,
             onChange: (e) => setQ2(e?.target?.value ?? e),
-            placeholder: 'Saring mata uang (mis. eur, sgd, jpy)…',
+            placeholder: 'Filter currencies (e.g. eur, sgd, jpy)…',
             style: { width: '100%', marginTop: '8px', marginBottom: '6px' },
           }),
           vsSupported.isError
-            ? jsx('div', { style: { color: 'var(--ui-danger, var(--ui-red))' }, children: 'Gagal memuat daftar mata uang — coba lagi nanti.' })
+            ? jsx('div', { style: { color: 'var(--ui-danger, var(--ui-red))' }, children: 'Failed to load the currency list — try again later.' })
             : null,
           ...vsCandidates.map((code) =>
             jsxs('div', {
@@ -528,13 +527,13 @@ function ManageCoins({ storage }) {
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
                 jsx('span', { style: { flex: 1 } }),
-                jsx(Button, { onClick: () => doAddCurrency(code), children: 'Tambah' }),
+                jsx(Button, { onClick: () => doAddCurrency(code), children: 'Add' }),
               ],
             }, code)
           ),
           jsx('div', {
             style: { marginTop: '8px' },
-            children: jsx(Button, { onClick: doResetCurrency, children: 'Reset mata uang ke USD + IDR' }),
+            children: jsx(Button, { onClick: doResetCurrency, children: 'Reset currencies to USD + IDR' }),
           }),
         ],
       }),
@@ -544,7 +543,7 @@ function ManageCoins({ storage }) {
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
-            children: 'Tampilan ticker',
+            children: 'Ticker display',
           }),
           jsxs('div', {
             style: { display: 'flex', alignItems: 'center', gap: '10px' },
@@ -567,14 +566,14 @@ function ManageCoins({ storage }) {
           jsxs('div', {
             style: { display: 'flex', gap: '8px', marginTop: '8px' },
             children: [
-              jsx(Button, { onClick: () => setTickWidthFn(Math.max(300, widthAtom.get() - 40)), children: '− Pendekkan' }),
-              jsx(Button, { onClick: () => setTickWidthFn(Math.min(1600, widthAtom.get() + 40)), children: '+ Panjangkan' }),
+              jsx(Button, { onClick: () => setTickWidthFn(Math.max(300, widthAtom.get() - 40)), children: '− Narrower' }),
+              jsx(Button, { onClick: () => setTickWidthFn(Math.min(1600, widthAtom.get() + 40)), children: '+ Wider' }),
               jsx(Button, { onClick: () => setTickWidthFn(1360), children: 'Reset' }),
             ],
           }),
           jsx('div', {
             style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem', marginTop: '6px' },
-            children: 'Perubahan langsung terlihat di bar bawah dan tersimpan otomatis. Tetap dibatasi maksimal 70% lebar jendela.',
+            children: 'Changes apply instantly to the bottom bar and are saved automatically. Always capped at 70% of the window width.',
           }),
         ],
       }),
@@ -588,7 +587,7 @@ export default {
   description:
     'Live crypto price ticker for the desktop status bar — Top 10 by market cap, marquee display, custom coins & currencies (CoinGecko, no API key).',
   register(ctx) {
-    // Bersihkan sisa key eksperimen lama (tidak dipakai lagi).
+    // Remove leftover keys from earlier experiments (no longer used).
     ctx.storage.remove('pane')
     ctx.storage.remove('pos')
 
@@ -637,7 +636,7 @@ export default {
       data: {
         id: 'crypto-prices.refresh',
         label: 'Crypto Prices: Refresh now',
-        keywords: ['crypto', 'harga', 'refresh'],
+        keywords: ['crypto', 'prices', 'refresh'],
         run: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
       },
     })
@@ -647,8 +646,8 @@ export default {
       area: PALETTE_AREA,
       data: {
         id: 'crypto-prices.currency',
-        label: 'Crypto Prices: Ganti mata uang (siklus daftar)',
-        keywords: ['crypto', 'currency', 'ganti', 'mata uang', 'usd', 'idr', 'rupiah', 'eur'],
+        label: 'Crypto Prices: Cycle display currency',
+        keywords: ['crypto', 'currency', 'switch', 'usd', 'idr', 'eur', 'jpy'],
         run: () => {
           const list = vsListAtom.get() || DEFAULT_VS_LIST
           const cur = vsAtom.get()
@@ -656,7 +655,7 @@ export default {
           const next = list[(idx + 1) % list.length] || DEFAULT_VS_LIST[0]
           vsAtom.set(next)
           ctx.storage.set('vs', next)
-          host.notify({ kind: 'info', message: `Crypto Prices: harga dalam ${next.toUpperCase()}` })
+          host.notify({ kind: 'info', message: `Crypto Prices: prices in ${next.toUpperCase()}` })
         },
       },
     })
@@ -666,15 +665,15 @@ export default {
       area: PALETTE_AREA,
       data: {
         id: 'crypto-prices.manage',
-        label: 'Crypto Prices: Kelola Koin & Mata Uang',
-        keywords: ['crypto', 'koin', 'coin', 'tambah', 'hapus', 'kelola', 'mata uang', 'currency'],
+        label: 'Crypto Prices: Open Settings',
+        keywords: ['crypto', 'coins', 'currencies', 'settings', 'add', 'remove', 'manage'],
         run: () => {
           if (typeof host.openWorkspace !== 'function') {
-            host.notifyError(new Error('host.openWorkspace tidak tersedia'), 'Kelola Koin butuh Hermes Desktop versi terbaru')
+            host.notifyError(new Error('host.openWorkspace tidak tersedia'), 'Settings requires a newer Hermes Desktop')
             return
           }
           host.openWorkspace(`${PLUGIN_ID}:manage`, {
-            title: 'Kelola Koin & Mata Uang · Crypto',
+            title: 'Settings · Crypto Prices',
             minWidth: 380,
             render: () => jsx(ManageCoins, { storage: ctx.storage }),
           })
