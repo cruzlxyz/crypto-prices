@@ -18,10 +18,8 @@
  *  - HTTP 429 -> back off 5 minutes before the next refetch.
  *
  * Commands (Ctrl+K):
- *      - Refresh now
- *      - Cycle display currency
- *      - Open Settings (coins: search/add/remove/reset; currencies:
- *        set active/add/remove/reset; ticker width slider)
+ *      - Open Settings (refresh now; coins: search/add/remove/reset;
+ *        currencies: set active/add/remove/reset; ticker width slider)
  *
  * Config (stored under ctx.storage, keys namespaced hermes.plugin.crypto-prices.*):
  *  - vs        : active display currency (must be a member of vsList)
@@ -429,9 +427,21 @@ function ManageCoins({ storage }) {
     children: [
       jsxs('div', {
         key: 'head',
+        style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' },
         children: [
-          jsx('div', { style: { fontWeight: 700, color: 'var(--ui-text-primary)', fontSize: '0.95rem' }, children: 'Crypto Prices — Settings' }),
-          jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Data: CoinGecko · default mode: Top 10 by market cap' }),
+          jsxs('div', {
+            children: [
+              jsx('div', { style: { fontWeight: 700, color: 'var(--ui-text-primary)', fontSize: '0.95rem' }, children: 'Crypto Prices — Settings' }),
+              jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Data: CoinGecko · default mode: Top 10 by market cap' }),
+            ],
+          }),
+          jsx(Button, {
+            onClick: () => {
+              haptic('tap')
+              queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+            },
+            children: 'Refresh now',
+          }),
         ],
       }),
 
@@ -631,45 +641,15 @@ export default {
     })
 
     ctx.register({
-      id: 'refresh-cmd',
-      area: PALETTE_AREA,
-      data: {
-        id: 'crypto-prices.refresh',
-        label: 'Crypto Prices: Refresh now',
-        keywords: ['crypto', 'prices', 'refresh'],
-        run: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
-      },
-    })
-
-    ctx.register({
-      id: 'currency-cmd',
-      area: PALETTE_AREA,
-      data: {
-        id: 'crypto-prices.currency',
-        label: 'Crypto Prices: Cycle display currency',
-        keywords: ['crypto', 'currency', 'switch', 'usd', 'idr', 'eur', 'jpy'],
-        run: () => {
-          const list = vsListAtom.get() || DEFAULT_VS_LIST
-          const cur = vsAtom.get()
-          const idx = list.indexOf(cur)
-          const next = list[(idx + 1) % list.length] || DEFAULT_VS_LIST[0]
-          vsAtom.set(next)
-          ctx.storage.set('vs', next)
-          host.notify({ kind: 'info', message: `Crypto Prices: prices in ${next.toUpperCase()}` })
-        },
-      },
-    })
-
-    ctx.register({
       id: 'manage-cmd',
       area: PALETTE_AREA,
       data: {
         id: 'crypto-prices.manage',
         label: 'Crypto Prices: Open Settings',
-        keywords: ['crypto', 'coins', 'currencies', 'settings', 'add', 'remove', 'manage'],
+        keywords: ['crypto', 'coins', 'currencies', 'settings', 'add', 'remove', 'manage', 'refresh', 'currency'],
         run: () => {
           if (typeof host.openWorkspace !== 'function') {
-            host.notifyError(new Error('host.openWorkspace tidak tersedia'), 'Settings requires a newer Hermes Desktop')
+            host.notifyError(new Error('host.openWorkspace unavailable'), 'Settings requires a newer Hermes Desktop')
             return
           }
           host.openWorkspace(`${PLUGIN_ID}:manage`, {

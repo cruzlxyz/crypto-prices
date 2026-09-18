@@ -31,9 +31,9 @@ Press `Ctrl+K` (command palette) and type "crypto":
 
 | Command | What it does |
 |---|---|
-| **Refresh now** | Force a refetch |
-| **Cycle display currency** | Cycle through your enabled display currencies |
-| **Open Settings** | Open the settings tab — coins: search (≥ 2 letters) → add, remove pinned coins, reset to the live Top 10; currencies: set active, add from the supported list, remove, reset; ticker: width slider |
+| **Open Settings** | Everything lives here — refresh now; coins (search ≥ 2 letters → add, remove pinned coins, reset to the live Top 10); currencies (set active, add from the supported list, remove, reset); ticker width slider |
+
+Tip: clicking the ticker in the status bar also refreshes instantly.
 
 Once you add or remove a coin, the list locks to your choice; **Reset** returns to the automatic Top 10.
 
