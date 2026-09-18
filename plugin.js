@@ -349,6 +349,7 @@ function ManageCoins({ storage }) {
   const vs = useValue(vsAtom)
   const tickWidth = useValue(widthAtom)
   const [q2, setQ2] = useState('')
+  const [section, setSection] = useState('coins')
 
   const vsSupported = useQuery({
     queryKey: [...QUERY_KEY, 'vscurrencies'],
@@ -445,8 +446,38 @@ function ManageCoins({ storage }) {
         ],
       }),
 
+      jsx('div', {
+        key: 'tabbar',
+        style: { display: 'flex', gap: '2px', borderBottom: '1px solid var(--ui-border)' },
+        children: [
+          { id: 'coins', label: 'Coins' },
+          { id: 'currencies', label: 'Currencies' },
+          { id: 'ticker', label: 'Ticker display' },
+        ].map((t) =>
+          jsx('button', {
+            key: t.id,
+            type: 'button',
+            onClick: () => setSection(t.id),
+            style: {
+              padding: '6px 14px',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: '0.8rem',
+              fontWeight: section === t.id ? 700 : 400,
+              color: section === t.id ? 'var(--ui-accent)' : 'var(--ui-text-tertiary)',
+              borderBottom: section === t.id ? '2px solid var(--ui-accent)' : '2px solid transparent',
+              marginBottom: '-1px',
+            },
+            children: t.label,
+          })
+        ),
+      }),
+
       jsxs('div', {
         key: 'current',
+        style: { display: section === 'coins' ? undefined : 'none' },
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
@@ -474,6 +505,7 @@ function ManageCoins({ storage }) {
 
       jsxs('div', {
         key: 'add',
+        style: { display: section === 'coins' ? undefined : 'none' },
         children: [
           jsx('div', { style: { fontWeight: 600, marginBottom: '4px' }, children: 'Add coins' }),
           jsx(Input, {
@@ -504,6 +536,7 @@ function ManageCoins({ storage }) {
 
       jsxs('div', {
         key: 'currency',
+        style: { display: section === 'currencies' ? undefined : 'none' },
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
@@ -550,6 +583,7 @@ function ManageCoins({ storage }) {
 
       jsxs('div', {
         key: 'ticker',
+        style: { display: section === 'ticker' ? undefined : 'none' },
         children: [
           jsx('div', {
             style: { fontWeight: 600, marginBottom: '4px' },
