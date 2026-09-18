@@ -20,9 +20,12 @@ A tiny [Hermes Desktop](https://github.com/NousResearch/hermes-agent) plugin tha
 
 ## Install
 
-> The plugin lives in the desktop **plugins folder** of your Hermes home:
-> - **macOS / Linux:** `~/.hermes/desktop-plugins/`
-> - **Windows:** `%LOCALAPPDATA%\hermes\desktop-plugins\`
+> The plugin is a **unified Hermes plugin package** (agent manifest + desktop half). It lives in the
+> **plugins folder** of your Hermes home:
+> - **macOS / Linux:** `~/.hermes/plugins/`
+> - **Windows:** `%LOCALAPPDATA%\hermes\plugins\`
+>
+> Hermes automatically copies the desktop half into `desktop-plugins/` and manages that copy itself — never edit it by hand.
 
 Pick **one** of these three ways:
 
