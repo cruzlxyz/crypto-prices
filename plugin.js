@@ -119,15 +119,36 @@ function useMarketRows(ids, vs, storage) {
   return query
 }
 
-function fmtPrice(p, vs) {
-  if (vs === 'idr') {
-    if (p >= 1000) return 'Rp ' + Math.round(p).toLocaleString('id-ID')
-    return 'Rp ' + p.toFixed(2)
+// Locale per mata uang: id-ID buat Rp (format 1.443.243.621), sisanya en-US.
+// en-US sudah ngasih simbol asli untuk mayoritas (¥, €, £, ₩, HK$, CN¥);
+// kode yang di en-US tampil sebagai kode ISO (SGD, THB, ...) sengaja dibiarkan
+// agar tidak ambigu dengan "$"-nya USD.
+const VS_LOCALE = { idr: 'id-ID' }
+
+const _fmtCache = new Map()
+function currencyFormatter(code, locale, bucket) {
+  const key = `${code}:${locale}:${bucket}`
+  if (!_fmtCache.has(key)) {
+    const opts = { style: 'currency', currency: code }
+    if (bucket === 0) Object.assign(opts, { maximumFractionDigits: 0 })
+    else if (bucket === 2) Object.assign(opts, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    else if (bucket === 4) Object.assign(opts, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+    else Object.assign(opts, { maximumSignificantDigits: 3 })
+    _fmtCache.set(key, new Intl.NumberFormat(locale, opts))
   }
-  if (p >= 1000) return '$' + Math.round(p).toLocaleString('en-US')
-  if (p >= 1) return '$' + p.toFixed(2)
-  if (p >= 0.01) return '$' + p.toFixed(4)
-  return '$' + p.toPrecision(3)
+  return _fmtCache.get(key)
+}
+
+function fmtPrice(p, vs) {
+  const key = (vs || 'usd').toLowerCase()
+  const code = key.toUpperCase()
+  const bucket = p >= 1000 ? 0 : p >= 1 ? 2 : p >= 0.01 ? 4 : 6
+  try {
+    return currencyFormatter(code, VS_LOCALE[key] || 'en-US', bucket).format(p)
+  } catch {
+    // Kode di luar ISO 4217 (mis. vs kripto) — tampil kode + angka saja.
+    return `${code} ${bucket === 0 ? Math.round(p).toLocaleString('en-US') : p.toFixed(bucket === 2 ? 2 : 4)}`
+  }
 }
 
 function fmtChange(ch) {
