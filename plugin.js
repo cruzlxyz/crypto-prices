@@ -274,6 +274,22 @@ function StatusPrices({ storage }) {
   )
 }
 
+/** Per-section heading + one-liner shown under the tab bar. */
+const SECTION_META = {
+  coins: {
+    title: 'Coins',
+    desc: 'Pin the coins you always want in the ticker. By default it follows the live Top 10 by market cap.',
+  },
+  currencies: {
+    title: 'Currencies',
+    desc: 'Keep a few display currencies on hand and switch the active one any time.',
+  },
+  ticker: {
+    title: 'Ticker display',
+    desc: 'Set the width of the ticker box in the status bar. Changes apply instantly and are saved automatically.',
+  },
+}
+
 /** Settings tab — coin search/add/remove/reset, opened via host.openWorkspace. */
 function ManageCoins({ storage }) {
   const coins = useValue(coinsAtom)
@@ -473,6 +489,14 @@ function ManageCoins({ storage }) {
             children: t.label,
           })
         ),
+      }),
+
+      jsxs('div', {
+        key: 'sec-head',
+        children: [
+          jsx('div', { style: { fontWeight: 700, fontSize: '0.9rem', color: 'var(--ui-text-primary)' }, children: SECTION_META[section].title }),
+          jsx('div', { style: { color: 'var(--ui-text-tertiary)', fontSize: '0.78rem' }, children: SECTION_META[section].desc }),
+        ],
       }),
 
       jsxs('div', {
