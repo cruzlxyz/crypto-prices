@@ -30,12 +30,12 @@ Pick **one** of these three ways:
 
 ```bash
 # macOS / Linux
-git clone https://github.com/cruzlxyz/crypto-prices "$HOME/.hermes/desktop-plugins/crypto-prices"
+git clone https://github.com/cruzlxyz/crypto-prices "$HOME/.hermes/plugins/crypto-prices"
 ```
 
 ```powershell
 # Windows (PowerShell)
-git clone https://github.com/cruzlxyz/crypto-prices "$env:LOCALAPPDATA\hermes\desktop-plugins\crypto-prices"
+git clone https://github.com/cruzlxyz/crypto-prices "$env:LOCALAPPDATA\hermes\plugins\crypto-prices"
 ```
 
 **Option B — One-click install link**
@@ -93,13 +93,13 @@ Behavior notes:
 - **Fully remove:**
   ```bash
   # macOS / Linux
-  rm -rf "$HOME/.hermes/desktop-plugins/crypto-prices"
+  rm -rf "$HOME/.hermes/plugins/crypto-prices"
   ```
   ```powershell
   # Windows (PowerShell)
-  Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\desktop-plugins\crypto-prices"
+  Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\plugins\crypto-prices"
   ```
-  then press `Ctrl+K` → **"Reload desktop plugins"**.
+  Hermes removes the managed desktop copy automatically when the package folder disappears.
 - Your settings are stored under the plugin's own namespace (`hermes.plugin.crypto-prices.*`) inside Hermes' plugin storage — they are not written into the plugin folder, so updating/re-cloning the folder never loses your coins, currency, or width preferences.
 
 ## Configuration reference
@@ -116,7 +116,7 @@ You normally configure everything through the Settings tab. These are the underl
 
 ## How it works (for the curious)
 
-- A single `plugin.js` ESM file implementing the official `HermesPlugin` contract (`register(ctx)`) of the [Desktop Plugin SDK](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/desktop-plugin-sdk.md).
+- A unified package: `plugin.yaml` (agent manifest, `kind: standalone`) + a single `desktop/plugin.js` ESM file implementing the official `HermesPlugin` contract (`register(ctx)`) of the [Desktop Plugin SDK](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/desktop-plugin-sdk.md).
 - Data endpoints: `/coins/markets` (live Top 10 / pinned quotes), `/search` (coin lookup), `/simple/supported_vs_currencies` (currency list).
 - Seamless marquee via duplicated content + `translateX(-50%)` CSS animation; honors the OS **reduce-motion** setting.
 - Colors use the app's theme tokens with guaranteed fallbacks (`--ui-green` / `--ui-red`), so it reskins with every theme.
@@ -125,7 +125,7 @@ You normally configure everything through the Settings tab. These are the underl
 
 | Symptom | Fix |
 |---|---|
-| Plugin not in the list | Check the folder is `<Hermes home>/desktop-plugins/crypto-prices/` (folder name must match the plugin `id`) and contains `plugin.js` |
+| Plugin not in the list | Check the folder is `<Hermes home>/plugins/crypto-prices/` (folder name must match the plugin `id`) and contains `plugin.yaml` + `desktop/plugin.js` |
 | Loaded but no ticker | Toggle it on in Capabilities → Plugins; then `Ctrl+K` → "Reload desktop plugins" |
 | Red dot / prices frozen | Last fetch failed (offline or rate-limited) — click the ticker to retry, or check `hermes logs gui -f` |
 | Coin shows "⋯" | The pinned coin has no price for the active currency yet — wait for the next refresh or switch currency |

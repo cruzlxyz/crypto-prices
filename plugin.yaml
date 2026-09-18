@@ -1,0 +1,11 @@
+name: crypto-prices
+version: 0.1.0
+description: Live crypto price ticker for the desktop status bar — Top 10 by market cap, custom coins & currencies (CoinGecko, no API key).
+manifest_version: 1
+kind: standalone
+author: cruzlxyz
+license: MIT
+homepage: https://github.com/cruzlxyz/crypto-prices
+capabilities: []
+requires_env: []
+python_dependencies: []
