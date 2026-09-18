@@ -449,7 +449,11 @@ function ManageCoins({ storage }) {
           jsxs('div', {
             children: [
               jsx('div', { style: { fontWeight: 700, color: 'var(--ui-text-primary)', fontSize: '0.95rem' }, children: 'Crypto Prices — Settings' }),
-              jsx('div', { style: { color: 'var(--ui-text-tertiary)' }, children: 'Data: CoinGecko · default mode: Top 10 by market cap' }),
+              jsx('div', {
+                style: { color: 'var(--ui-text-tertiary)', fontSize: '0.78rem', lineHeight: 1.5, maxWidth: '640px' },
+                children:
+                  'Live cryptocurrency prices for your status bar, powered by the free CoinGecko public API. The ticker follows the live Top 10 by market cap and refreshes every 60 seconds — pin your own coins, switch display currencies, and fine-tune the ticker width from the tabs below.',
+              }),
             ],
           }),
           jsx(Button, {
