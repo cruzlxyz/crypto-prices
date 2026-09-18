@@ -539,6 +539,8 @@ function ManageCoins({ storage }) {
 export default {
   id: PLUGIN_ID,
   name: 'Crypto Prices',
+  description:
+    'Live crypto price ticker for the desktop status bar — Top 10 by market cap, marquee display, custom coins & currencies (CoinGecko, no API key).',
   register(ctx) {
     // Bersihkan sisa key eksperimen lama (tidak dipakai lagi).
     ctx.storage.remove('pane')
