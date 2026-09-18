@@ -24,6 +24,8 @@
  *        mata uang — pilih aktif/tambah/hapus/reset)
  *
  * Konfigurasi (tersimpan di ctx.storage, key namespace hermes.plugin.crypto-prices.*):
+ *  - tickWidth : lebar kotak ticker dalam px (default 1360, diatur dari tab
+ *                Kelola — slider; tetap dibatasi maks 70% lebar jendela)
  *  - vs     : mata uang aktif (harus anggota vsList)
  *  - vsList : daftar mata uang yang bisa disiklus/dipilih
  *             (default: ['usd','idr']; sumber daftar lengkap:
@@ -62,7 +64,7 @@ const DEFAULT_VS_LIST = ['usd', 'idr']
 const STYLE_ID = 'crypto-prices-styles'
 const TICKER_CSS = `
 @keyframes cp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.cp-viewport { overflow: hidden; width: min(1360px, 70vw); }
+.cp-viewport { overflow: hidden; width: min(var(--cp-width, 1360px), 70vw); }
 .cp-track { display: inline-flex; animation: cp-marquee 35s linear infinite; will-change: transform; }
 .cp-btn:hover .cp-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .cp-track { animation: none; } }
@@ -74,10 +76,13 @@ const vsAtom = atom('usd')
 const vsListAtom = atom(DEFAULT_VS_LIST)
 /** null = otomatis Top 10; array [{id, symbol}] = daftar pin dari Kelola Koin. */
 const coinsAtom = atom(null)
+/** Lebar kotak ticker (px) — diatur dari tab Kelola, diterapkan via CSS var. */
+const widthAtom = atom(1360)
 
 /** Di-set di register(): menulis daftar koin ke atom + storage sekaligus. */
 let setCoinsFn = null
 let setVsListFn = null
+let setTickWidthFn = null
 
 /** Timestamp backoff rate-limit (429) — refetch ditunda sampai lewat. */
 let backoffUntil = 0
@@ -345,6 +350,7 @@ function ManageCoins({ storage }) {
   // ---- Mata uang ----
   const vsList = useValue(vsListAtom)
   const vs = useValue(vsAtom)
+  const tickWidth = useValue(widthAtom)
   const [q2, setQ2] = useState('')
 
   const vsSupported = useQuery({
@@ -532,6 +538,46 @@ function ManageCoins({ storage }) {
           }),
         ],
       }),
+
+      jsxs('div', {
+        key: 'ticker',
+        children: [
+          jsx('div', {
+            style: { fontWeight: 600, marginBottom: '4px' },
+            children: 'Tampilan ticker',
+          }),
+          jsxs('div', {
+            style: { display: 'flex', alignItems: 'center', gap: '10px' },
+            children: [
+              jsx('input', {
+                type: 'range',
+                min: 300,
+                max: 1600,
+                step: 20,
+                value: tickWidth,
+                onChange: (e) => setTickWidthFn(Number(e?.target?.value ?? 1360)),
+                style: { flex: 1, accentColor: 'var(--ui-accent)', cursor: 'pointer' },
+              }),
+              jsx('span', {
+                style: { fontVariantNumeric: 'tabular-nums', color: 'var(--ui-text-primary)', width: '64px', textAlign: 'right' },
+                children: `${tickWidth}px`,
+              }),
+            ],
+          }),
+          jsxs('div', {
+            style: { display: 'flex', gap: '8px', marginTop: '8px' },
+            children: [
+              jsx(Button, { onClick: () => setTickWidthFn(Math.max(300, widthAtom.get() - 40)), children: '− Pendekkan' }),
+              jsx(Button, { onClick: () => setTickWidthFn(Math.min(1600, widthAtom.get() + 40)), children: '+ Panjangkan' }),
+              jsx(Button, { onClick: () => setTickWidthFn(1360), children: 'Reset' }),
+            ],
+          }),
+          jsx('div', {
+            style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem', marginTop: '6px' },
+            children: 'Perubahan langsung terlihat di bar bawah dan tersimpan otomatis. Tetap dibatasi maksimal 70% lebar jendela.',
+          }),
+        ],
+      }),
     ],
   })
 }
@@ -559,6 +605,16 @@ export default {
     setVsListFn = (list) => {
       vsListAtom.set(list)
       ctx.storage.set('vsList', list)
+    }
+
+    const applyTickWidth = (px) => {
+      widthAtom.set(px)
+      document.documentElement.style.setProperty('--cp-width', `${px}px`)
+    }
+    applyTickWidth(ctx.storage.get('tickWidth', 1360))
+    setTickWidthFn = (px) => {
+      ctx.storage.set('tickWidth', px)
+      applyTickWidth(px)
     }
 
     if (!document.getElementById(STYLE_ID)) {
