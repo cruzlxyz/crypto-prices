@@ -6,10 +6,8 @@
 
 A tiny [Hermes Desktop](https://github.com/NousResearch/hermes-agent) plugin that shows **live cryptocurrency prices** as a smooth scrolling ticker in the desktop **status bar**. Built on the official Desktop Plugin SDK — one plain ESM file, no build step, no API key.
 
-<!-- 📷 SCREENSHOT #1 — status bar ticker
-     Save a cropped screenshot of your bottom status bar as docs/screenshot-ticker.png, then uncomment the line below:
-![Live crypto ticker in the Hermes Desktop status bar](docs/screenshot-ticker.png)
--->
+<img width="1115" height="98" alt="image" src="https://github.com/user-attachments/assets/739022a2-5cce-47f8-a7ac-b943949f49b9" />
+
 
 ## Requirements
 
@@ -63,10 +61,8 @@ After any option, the app watches the folder and **loads the plugin within a few
 
 > **Not showing?** Press `Ctrl+K` → **"Reload desktop plugins"**, then re-check the toggle.
 
-<!-- 📷 SCREENSHOT #2 — Settings tab
-     Save a screenshot of the Settings page as docs/screenshot-settings.png, then uncomment the line below:
-![Crypto Prices Settings tab](docs/screenshot-settings.png)
--->
+<img width="1258" height="578" alt="image" src="https://github.com/user-attachments/assets/cebaf14f-799a-4aba-856f-e003e28e886a" />
+
 
 ## Usage
 
