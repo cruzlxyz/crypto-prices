@@ -19,14 +19,18 @@
  *  - Kena rate-limit 429 → mundur 5 menit sebelum refetch berikutnya.
  *  - Perintah Ctrl+K:
  *      · Refresh now
- *      · Ganti mata uang USD ⇄ IDR
- *      · Kelola Koin (buka tab: cari, tambah, hapus, reset ke Top 10)
+ *      · Ganti mata uang (siklus daftar mata uang yang aktif)
+ *      · Kelola Koin & Mata Uang (buka tab: koin — cari/tambah/hapus/reset;
+ *        mata uang — pilih aktif/tambah/hapus/reset)
  *
  * Konfigurasi (tersimpan di ctx.storage, key namespace hermes.plugin.crypto-prices.*):
- *  - vs    : mata uang ('usd' | 'idr')
- *  - coins : null = otomatis Top 10 market cap; atau daftar pin
- *            [{id, symbol}, ...] dari tab Kelola Koin.
- *            Kosong (habis dihapus semua) → balik ke otomatis Top 10.
+ *  - vs     : mata uang aktif (harus anggota vsList)
+ *  - vsList : daftar mata uang yang bisa disiklus/dipilih
+ *             (default: ['usd','idr']; sumber daftar lengkap:
+ *             /simple/supported_vs_currencies)
+ *  - coins  : null = otomatis Top 10 market cap; atau daftar pin
+ *             [{id, symbol}, ...] dari tab Kelola Koin.
+ *             Kosong (habis dihapus semua) → balik ke otomatis Top 10.
  *
  * Plain ESM, tanpa build step. Loader desktop hanya mengizinkan import
  * '@hermes/plugin-sdk', 'react', dan 'react/jsx-runtime'.
@@ -51,6 +55,7 @@ const PLUGIN_ID = 'crypto-prices'
 const QUERY_KEY = ['crypto-prices']
 const REFRESH_MS = 60_000
 const API_BASE = 'https://api.coingecko.com/api/v3'
+const DEFAULT_VS_LIST = ['usd', 'idr']
 
 // Ticker/marquee: kotak lebar tetap, track berisi 2 salinan urutan koin,
 // animasi translateX(-50%) linear infinite → keluar kiri, masuk lagi kanan.
@@ -65,6 +70,8 @@ const TICKER_CSS = `
 
 /** Shared di luar React supaya perintah palette bisa mengganti mata uang. */
 const vsAtom = atom('usd')
+/** Daftar mata uang aktif (bisa dikustom via tab Kelola). */
+const vsListAtom = atom(DEFAULT_VS_LIST)
 /** null = otomatis Top 10; array [{id, symbol}] = daftar pin dari Kelola Koin. */
 const coinsAtom = atom(null)
 
@@ -313,6 +320,63 @@ function ManageCoins({ storage }) {
     host.notify({ kind: 'info', message: 'Crypto Prices: kembali ke Top 10 market cap' })
   }
 
+  // ---- Mata uang ----
+  const vsList = useValue(vsListAtom)
+  const vs = useValue(vsAtom)
+  const [q2, setQ2] = useState('')
+
+  const vsSupported = useQuery({
+    queryKey: [...QUERY_KEY, 'vscurrencies'],
+    queryFn: async () => {
+      const resp = await fetch(`${API_BASE}/simple/supported_vs_currencies`, {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!resp.ok) throw new Error(`CoinGecko HTTP ${resp.status}`)
+      return resp.json()
+    },
+    staleTime: 24 * 60 * 60 * 1000,
+  })
+
+  const doUseCurrency = (code) => {
+    vsAtom.set(code)
+    storage.set('vs', code)
+    host.notify({ kind: 'info', message: `Crypto Prices: harga dalam ${code.toUpperCase()}` })
+  }
+
+  const doAddCurrency = (code) => {
+    const list = vsListAtom.get() || DEFAULT_VS_LIST
+    if (list.includes(code)) return
+    setVsListFn([...list, code])
+    host.notify({ kind: 'info', message: `Mata uang ${code.toUpperCase()} ditambahkan` })
+  }
+
+  const doRemoveCurrency = (code) => {
+    const list = vsListAtom.get() || DEFAULT_VS_LIST
+    if (list.length <= 1) {
+      host.notify({ kind: 'info', message: 'Minimal harus ada satu mata uang' })
+      return
+    }
+    const next = list.filter((c) => c !== code)
+    setVsListFn(next)
+    if (vsAtom.get() === code) {
+      vsAtom.set(next[0])
+      storage.set('vs', next[0])
+      host.notify({ kind: 'info', message: `Mata uang aktif pindah ke ${next[0].toUpperCase()}` })
+    }
+  }
+
+  const doResetCurrency = () => {
+    setVsListFn(DEFAULT_VS_LIST)
+    vsAtom.set(DEFAULT_VS_LIST[0])
+    storage.set('vs', DEFAULT_VS_LIST[0])
+    host.notify({ kind: 'info', message: 'Mata uang kembali ke USD + IDR' })
+  }
+
+  const term2 = q2.trim().toLowerCase()
+  const vsCandidates = ((vsSupported.data || []).filter(
+    (code) => !vsList.includes(code) && (!term2 || code.includes(term2))
+  )).slice(0, 12)
+
   const pinned = Array.isArray(coins)
   const shown = pinned ? coins : (storage.get('lastData', null)?.rows || []).map((r) => ({ id: r.id, symbol: (r.symbol || '?').toUpperCase() }))
 
@@ -400,6 +464,52 @@ function ManageCoins({ storage }) {
           }),
         ],
       }),
+
+      jsxs('div', {
+        key: 'currency',
+        children: [
+          jsx('div', {
+            style: { fontWeight: 600, marginBottom: '4px' },
+            children: `Mata uang (${vsList.length}) — aktif: ${vs.toUpperCase()}`,
+          }),
+          ...vsList.map((code) =>
+            jsxs('div', {
+              style: rowStyle,
+              children: [
+                jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
+                jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: code === vs ? '● aktif' : '' }),
+                code !== vs
+                  ? jsx(Button, { onClick: () => doUseCurrency(code), children: 'Pakai' })
+                  : null,
+                jsx(Button, { onClick: () => doRemoveCurrency(code), disabled: vsList.length <= 1, children: 'Hapus' }),
+              ],
+            }, code)
+          ),
+          jsx(Input, {
+            value: q2,
+            onChange: (e) => setQ2(e?.target?.value ?? e),
+            placeholder: 'Saring mata uang (mis. eur, sgd, jpy)…',
+            style: { width: '100%', marginTop: '8px', marginBottom: '6px' },
+          }),
+          vsSupported.isError
+            ? jsx('div', { style: { color: 'var(--ui-danger, var(--ui-red))' }, children: 'Gagal memuat daftar mata uang — coba lagi nanti.' })
+            : null,
+          ...vsCandidates.map((code) =>
+            jsxs('div', {
+              style: rowStyle,
+              children: [
+                jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
+                jsx('span', { style: { flex: 1 } }),
+                jsx(Button, { onClick: () => doAddCurrency(code), children: 'Tambah' }),
+              ],
+            }, code)
+          ),
+          jsx('div', {
+            style: { marginTop: '8px' },
+            children: jsx(Button, { onClick: doResetCurrency, children: 'Reset mata uang ke USD + IDR' }),
+          }),
+        ],
+      }),
     ],
   })
 }
@@ -414,11 +524,17 @@ export default {
 
     vsAtom.set(ctx.storage.get('vs', 'usd'))
     coinsAtom.set(ctx.storage.get('coins', null))
+    vsListAtom.set(ctx.storage.get('vsList', DEFAULT_VS_LIST))
 
     setCoinsFn = (list) => {
       coinsAtom.set(list)
       if (list) ctx.storage.set('coins', list)
       else ctx.storage.remove('coins')
+    }
+
+    setVsListFn = (list) => {
+      vsListAtom.set(list)
+      ctx.storage.set('vsList', list)
     }
 
     if (!document.getElementById(STYLE_ID)) {
@@ -451,10 +567,13 @@ export default {
       area: PALETTE_AREA,
       data: {
         id: 'crypto-prices.currency',
-        label: 'Crypto Prices: Ganti mata uang (USD ⇄ IDR)',
-        keywords: ['crypto', 'currency', 'usd', 'idr', 'rupiah'],
+        label: 'Crypto Prices: Ganti mata uang (siklus daftar)',
+        keywords: ['crypto', 'currency', 'ganti', 'mata uang', 'usd', 'idr', 'rupiah', 'eur'],
         run: () => {
-          const next = vsAtom.get() === 'usd' ? 'idr' : 'usd'
+          const list = vsListAtom.get() || DEFAULT_VS_LIST
+          const cur = vsAtom.get()
+          const idx = list.indexOf(cur)
+          const next = list[(idx + 1) % list.length] || DEFAULT_VS_LIST[0]
           vsAtom.set(next)
           ctx.storage.set('vs', next)
           host.notify({ kind: 'info', message: `Crypto Prices: harga dalam ${next.toUpperCase()}` })
@@ -467,15 +586,15 @@ export default {
       area: PALETTE_AREA,
       data: {
         id: 'crypto-prices.manage',
-        label: 'Crypto Prices: Kelola Koin (tambah / hapus / reset)',
-        keywords: ['crypto', 'koin', 'coin', 'tambah', 'hapus', 'kelola'],
+        label: 'Crypto Prices: Kelola Koin & Mata Uang',
+        keywords: ['crypto', 'koin', 'coin', 'tambah', 'hapus', 'kelola', 'mata uang', 'currency'],
         run: () => {
           if (typeof host.openWorkspace !== 'function') {
             host.notifyError(new Error('host.openWorkspace tidak tersedia'), 'Kelola Koin butuh Hermes Desktop versi terbaru')
             return
           }
           host.openWorkspace(`${PLUGIN_ID}:manage`, {
-            title: 'Kelola Koin · Crypto',
+            title: 'Kelola Koin & Mata Uang · Crypto',
             minWidth: 380,
             render: () => jsx(ManageCoins, { storage: ctx.storage }),
           })
