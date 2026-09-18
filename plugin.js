@@ -77,6 +77,7 @@ const coinsAtom = atom(null)
 
 /** Di-set di register(): menulis daftar koin ke atom + storage sekaligus. */
 let setCoinsFn = null
+let setVsListFn = null
 
 /** Timestamp backoff rate-limit (429) — refetch ditunda sampai lewat. */
 let backoffUntil = 0
