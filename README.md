@@ -6,7 +6,7 @@
 
 A tiny [Hermes Desktop](https://github.com/NousResearch/hermes-agent) plugin that shows **live cryptocurrency prices** as a smooth scrolling ticker in the desktop **status bar**. Built on the official Desktop Plugin SDK — one plain ESM file, no build step, no API key.
 
-<img width="1280" height="720" alt="Crypto Prices cover: dark banner with a live ticker for BTC, ETH, and SOL" src="assets/cover.jpg" />
+<img width="1280" height="720" alt="Crypto Prices cover: ticker for BTC, ETH, SOL, BNB, and XRP" src="assets/cover.jpg" />
 
 <img width="1115" height="98" alt="image" src="https://github.com/user-attachments/assets/739022a2-5cce-47f8-a7ac-b943949f49b9" />
 
