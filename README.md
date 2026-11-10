@@ -62,20 +62,22 @@ After any option, the app watches the folder and **loads the plugin within a few
 3. Look at the **bottom-right status bar** — you should see the ticker scrolling:
    `BTC … ▲ x.x% · ETH … · SOL …`
 
-> **Not showing?** Press `Ctrl+K` → **"Reload desktop plugins"**, then re-check the toggle.
+> **Not showing?** Press `Ctrl+P` → **Reload desktop plugins**, then re-check the toggle. `Ctrl+K` is the same palette, but the chat box often swallows it.
 
 <img width="1258" height="578" alt="image" src="https://github.com/user-attachments/assets/cebaf14f-799a-4aba-856f-e003e28e886a" />
 
 
 ## Usage
 
-Press `Ctrl+K` (command palette) → **"Crypto Prices: Open Settings"**. Everything lives in one place, split into three tabs:
+Open **Settings → Plugins → Crypto Prices**. That page is the home for every option, split into three tabs:
 
 | Tab | What you can do |
 |---|---|
 | **Coins** | See the current list (auto Top 10 by market cap), search & **add** any CoinGecko coin (type ≥ 2 letters), **remove** pinned coins, **Reset to Top 10** |
 | **Currencies** | **Use** to set the active display currency, **add** from 60+ supported codes (USD, IDR, EUR, JPY, SGD, …), **remove**, **reset** to USD + IDR |
 | **Ticker display** | Set the ticker box **width** with the slider (or `− Narrower` / `+ Wider` buttons); capped at 70% of the window width |
+
+The same page opens from the command palette: `Ctrl+K` or `Ctrl+P` → **Crypto Prices: Open Settings**. If `Ctrl+K` does nothing, click empty chrome first (the chat box eats that shortcut) and use `Ctrl+P`.
 
 Quick actions outside Settings:
 
@@ -107,7 +109,7 @@ Behavior notes:
 
 ## Configuration reference
 
-You normally configure everything through the Settings tab. These are the underlying storage keys (for reference / debugging):
+You normally configure everything through **Settings → Plugins → Crypto Prices**. These are the underlying storage keys (for reference / debugging):
 
 | Key | Meaning |
 |---|---|
@@ -119,7 +121,8 @@ You normally configure everything through the Settings tab. These are the underl
 
 ## How it works (for the curious)
 
-- A unified package: `plugin.yaml` (agent manifest, `kind: standalone`) + a single `desktop/plugin.js` ESM file implementing the official `HermesPlugin` contract (`register(ctx)`) of the [Desktop Plugin SDK](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/desktop-plugin-sdk.md).
+- A unified package: `plugin.yaml` (agent manifest, `kind: standalone`) + a single `desktop/plugin.js` ESM file implementing the official `HermesPlugin` contract (`register(ctx)`) of the [Desktop Plugin SDK](https://hermes-agent.nousresearch.com/docs/developer-guide/desktop-plugin-sdk).
+- Settings live on a real Settings page via `ctx.registerSettingsPage`, so the plugin shows up under **Settings → Plugins** next to other installed plugins. The command palette only jumps to that page.
 - Data endpoints: `/coins/markets` (live Top 10 / pinned quotes), `/search` (coin lookup), `/simple/supported_vs_currencies` (currency list).
 - Seamless marquee via duplicated content + `translateX(-50%)` CSS animation; honors the OS **reduce-motion** setting.
 - Colors use the app's theme tokens with guaranteed fallbacks (`--ui-green` / `--ui-red`), so it reskins with every theme.
@@ -129,13 +132,14 @@ You normally configure everything through the Settings tab. These are the underl
 | Symptom | Fix |
 |---|---|
 | Plugin not in the list | Check the folder is `<Hermes home>/plugins/crypto-prices/` (folder name must match the plugin `id`) and contains `plugin.yaml` + `desktop/plugin.js` |
-| Loaded but no ticker | Toggle it on in Capabilities → Plugins; then `Ctrl+K` → "Reload desktop plugins" |
+| Loaded but no ticker | Toggle it on in Capabilities → Plugins; then `Ctrl+P` → "Reload desktop plugins" |
 | Red dot / prices frozen | Last fetch failed (offline or rate-limited) — click the ticker to retry, or check `hermes logs gui -f` |
 | Coin shows "⋯" | The pinned coin has no price for the active currency yet — wait for the next refresh or switch currency |
 
 ## Tested on
 
 - **Hermes Desktop v0.21.3** (build `c661785`), Windows 11 x64
+- **Hermes Desktop Microsoft Store** `2026.7512.1650.0`, Windows 11 x64 (settings page under Settings → Plugins)
 - Should work on any recent Hermes Desktop build with the Desktop Plugin SDK (disk plugins door)
 
 ## Attribution

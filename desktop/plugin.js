@@ -17,9 +17,8 @@
  *    defined (--ui-green / --ui-red in styles.css).
  *  - HTTP 429 -> back off 5 minutes before the next refetch.
  *
- * Commands (Ctrl+K):
- *      - Open Settings (refresh now; coins: search/add/remove/reset;
- *        currencies: set active/add/remove/reset; ticker width slider)
+ * Commands (Ctrl+K / Ctrl+P):
+ *      - Crypto Prices: Open Settings — jumps to Settings → Plugins → Crypto Prices
  *
  * Config (stored under ctx.storage, keys namespaced hermes.plugin.crypto-prices.*):
  *  - vs        : active display currency (must be a member of vsList)
@@ -290,7 +289,7 @@ const SECTION_META = {
   },
 }
 
-/** Settings tab — coin search/add/remove/reset, opened via host.openWorkspace. */
+/** Settings page under Settings → Plugins, also reachable from the command palette. */
 function ManageCoins({ storage }) {
   const coins = useValue(coinsAtom)
   const [q, setQ] = useState('')
@@ -656,7 +655,7 @@ function ManageCoins({ storage }) {
 export default {
   id: PLUGIN_ID,
   name: 'Crypto Prices',
-  version: '0.1.0',
+  version: '0.1.1',
   description:
     'Live crypto price ticker for the desktop status bar — Top 10 by market cap, marquee display, custom coins & currencies (CoinGecko, no API key).',
   register(ctx) {
@@ -703,6 +702,25 @@ export default {
       render: () => jsx(StatusPrices, { storage: ctx.storage }),
     })
 
+    const settingsPage = {
+      id: 'settings',
+      title: 'Crypto Prices',
+      icon: 'graph',
+      order: 20,
+      render: () => jsx(ManageCoins, { storage: ctx.storage }),
+    }
+    if (typeof ctx.registerSettingsPage === 'function') {
+      ctx.registerSettingsPage(settingsPage)
+    } else {
+      ctx.register({
+        id: 'settings-page',
+        area: 'settings.plugins',
+        title: 'Crypto Prices',
+        render: settingsPage.render,
+        data: { icon: 'graph' },
+      })
+    }
+
     ctx.register({
       id: 'manage-cmd',
       area: PALETTE_AREA,
@@ -710,17 +728,7 @@ export default {
         id: 'crypto-prices.manage',
         label: 'Crypto Prices: Open Settings',
         keywords: ['crypto', 'coins', 'currencies', 'settings', 'add', 'remove', 'manage', 'refresh', 'currency'],
-        run: () => {
-          if (typeof host.openWorkspace !== 'function') {
-            host.notifyError(new Error('host.openWorkspace unavailable'), 'Settings requires a newer Hermes Desktop')
-            return
-          }
-          host.openWorkspace(`${PLUGIN_ID}:manage`, {
-            title: 'Settings · Crypto Prices',
-            minWidth: 380,
-            render: () => jsx(ManageCoins, { storage: ctx.storage }),
-          })
-        },
+        run: () => host.navigate('/settings?tab=plugins&plugin=crypto-prices'),
       },
     })
   },
