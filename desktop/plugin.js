@@ -54,6 +54,7 @@ const QUERY_KEY = ['crypto-prices']
 const REFRESH_MS = 60_000
 const API_BASE = 'https://api.coingecko.com/api/v3'
 const DEFAULT_VS_LIST = ['usd', 'idr']
+const DEFAULT_VS = DEFAULT_VS_LIST[0]
 
 // Ticker/marquee: fixed-width box, track holds two copies of the coin
 // sequence, translateX(-50%) linear infinite → exits left, re-enters right.
@@ -67,7 +68,7 @@ const TICKER_CSS = `
 `
 
 /** Shared outside React so palette commands can switch the display currency. */
-const vsAtom = atom('usd')
+const vsAtom = atom(DEFAULT_VS)
 /** Active display currencies (customizable from the Settings tab). */
 const vsListAtom = atom(DEFAULT_VS_LIST)
 /** null = auto Top 10; array [{id, symbol}] = pinned list from the Settings tab. */
@@ -141,14 +142,24 @@ function currencyFormatter(code, locale, bucket) {
 }
 
 function fmtPrice(p, vs) {
-  const key = (vs || 'usd').toLowerCase()
+  const key = (vs || DEFAULT_VS).toLowerCase()
   const code = key.toUpperCase()
   const bucket = p >= 1000 ? 0 : p >= 1 ? 2 : p >= 0.01 ? 4 : 6
   try {
     return currencyFormatter(code, VS_LOCALE[key] || 'en-US', bucket).format(p)
   } catch {
     // Non-ISO code (e.g. a crypto vs) — show the code + number only.
-    return `${code} ${bucket === 0 ? Math.round(p).toLocaleString('en-US') : p.toFixed(bucket === 2 ? 2 : 4)}`
+    // Buckets mirror the Intl path above: 0 → integer, 2 → 2dp, 4 → 4dp,
+    // 6 → 3 significant digits.
+    const body =
+      bucket === 0
+        ? Math.round(p).toLocaleString('en-US')
+        : bucket === 2
+          ? p.toFixed(2)
+          : bucket === 4
+            ? p.toFixed(4)
+            : p.toPrecision(3)
+    return `${code} ${body}`
   }
 }
 
@@ -408,8 +419,8 @@ function ManageCoins({ storage }) {
 
   const doResetCurrency = () => {
     setVsListFn(DEFAULT_VS_LIST)
-    vsAtom.set(DEFAULT_VS_LIST[0])
-    storage.set('vs', DEFAULT_VS_LIST[0])
+    vsAtom.set(DEFAULT_VS)
+    storage.set('vs', DEFAULT_VS)
     host.notify({ kind: 'info', message: 'Currencies reset to USD + IDR' })
   }
 
@@ -655,6 +666,8 @@ function ManageCoins({ storage }) {
 export default {
   id: PLUGIN_ID,
   name: 'Crypto Prices',
+  // Keep in sync with plugin.yaml (the manifest is the source of truth for
+  // the catalog; this copy is what the desktop loader shows).
   version: '0.1.1',
   description:
     'Live crypto price ticker for the desktop status bar — Top 10 by market cap, marquee display, custom coins & currencies (CoinGecko, no API key).',
@@ -663,7 +676,7 @@ export default {
     ctx.storage.remove('pane')
     ctx.storage.remove('pos')
 
-    vsAtom.set(ctx.storage.get('vs', 'usd'))
+    vsAtom.set(ctx.storage.get('vs', DEFAULT_VS))
     coinsAtom.set(ctx.storage.get('coins', null))
     vsListAtom.set(ctx.storage.get('vsList', DEFAULT_VS_LIST))
 
