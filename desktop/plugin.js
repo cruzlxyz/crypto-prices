@@ -668,7 +668,7 @@ export default {
   name: 'Crypto Prices',
   // Keep in sync with plugin.yaml (the manifest is the source of truth for
   // the catalog; this copy is what the desktop loader shows).
-  version: '0.1.1',
+  version: '0.2.0',
   description:
     'Live crypto price ticker for the desktop status bar — Top 10 by market cap, marquee display, custom coins & currencies (CoinGecko, no API key).',
   register(ctx) {
