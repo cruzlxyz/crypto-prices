@@ -516,7 +516,7 @@ function ManageCoins({ storage }) {
                   style: rowStyle,
                   children: [
                     jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: c.symbol }),
-                    jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: c.id }),
+                    jsx('span', { style: { color: 'var(--ui-text-tertiary)', fontSize: '0.72rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: c.id }),
                     pinned
                       ? jsx(Button, { onClick: () => doRemove(c.id), children: 'Remove' })
                       : jsx('span', { style: { color: 'var(--ui-text-quaternary)', fontSize: '0.72rem' }, children: 'auto' }),
@@ -549,7 +549,7 @@ function ManageCoins({ storage }) {
               style: rowStyle,
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: (r.symbol || '').toUpperCase() }),
-                jsx('span', { style: { flex: 1 }, children: r.name }),
+                jsx('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: r.name }),
                 jsx(Button, { onClick: () => doAdd(r), children: 'Add' }),
               ],
             }, r.id)
@@ -574,7 +574,7 @@ function ManageCoins({ storage }) {
               style: rowStyle,
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
-                jsx('span', { style: { flex: 1, color: 'var(--ui-text-tertiary)', fontSize: '0.72rem' }, children: code === vs ? '● active' : '' }),
+                jsx('span', { style: { color: 'var(--ui-text-tertiary)', fontSize: '0.72rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, children: code === vs ? '● active' : '' }),
                 code !== vs
                   ? jsx(Button, { onClick: () => doUseCurrency(code), children: 'Use' })
                   : null,
@@ -596,7 +596,7 @@ function ManageCoins({ storage }) {
               style: rowStyle,
               children: [
                 jsx('span', { style: { fontWeight: 600, color: 'var(--ui-text-primary)', width: '64px' }, children: code.toUpperCase() }),
-                jsx('span', { style: { flex: 1 } }),
+                jsx('span', { style: { minWidth: 0, flex: 1 } }),
                 jsx(Button, { onClick: () => doAddCurrency(code), children: 'Add' }),
               ],
             }, code)
